@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>खर्च सूची</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>खर्च सूची</h3>
+        <div>
+            <a href="{% url 'add_expense' %}" class="btn btn-danger">+ नया खर्च</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">डैशबोर्ड</a>
+        </div>
+    </div>
+
+    <div class="card bg-danger text-white mb-4 shadow-sm">
+        <div class="card-body py-3">
+            <h5 class="mb-0">कुल खर्च: ₹ {{ total_expense|floatformat:0 }}</h5>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>तारीख</th>
+                        <th>श्रेणी</th>
+                        <th>प्रॉपर्टी</th>
+                        <th>राशि</th>
+                        <th>विधि</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exp in expenses %}
+                    <tr>
+                        <td>{{ exp.date|date:"d M Y" }}</td>
+                        <td>{{ exp.get_category_display }}</td>
+                        <td>
+                            {% if exp.property %}
+                                {{ exp.property.property_name }}
+                            {% else %}
+                                <span class="text-muted">Common</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>₹{{ exp.amount }}</strong></td>
+                        <td>
+                            {% if exp.payment_method == 'CASH' %}
+                                💵 Cash
+                            {% else %}
+                                📱 Digital
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">अभी कोई खर्च नहीं है</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

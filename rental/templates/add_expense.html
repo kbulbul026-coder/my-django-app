@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Add Expense</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container my-4" style="max-width: 520px;">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h4 class="mb-4">नया खर्च जोड़ें</h4>
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label">तारीख</label>
+                    <input type="date" name="date" class="form-control" value="{{ today }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">राशि (₹)</label>
+                    <input type="number" name="amount" class="form-control" step="0.01" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">श्रेणी</label>
+                    <select name="category" class="form-select" required>
+                        <option value="MAINTENANCE">Maintenance / मरम्मत</option>
+                        <option value="WATER">Water Bill / पानी</option>
+                        <option value="ELECTRICITY">Electricity (Common)</option>
+                        <option value="CLEANING">Cleaning / सफाई</option>
+                        <option value="REPAIR">Repairs</option>
+                        <option value="TAX">Tax / Society</option>
+                        <option value="OTHER">Other / अन्य</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">प्रॉपर्टी (Optional)</label>
+                    <select name="property" class="form-select">
+                        <option value="">-- Common / सभी --</option>
+                        {% for prop in properties %}
+                            <option value="{{ prop.id }}">{{ prop.property_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">भुगतान विधि</label>
+                    <select name="payment_method" class="form-select">
+                        <option value="CASH">💵 Cash</option>
+                        <option value="DIGITAL">📱 Digital</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">विवरण (Optional)</label>
+                    <textarea name="description" class="form-control" rows="2"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100 mb-2">खर्च सेव करें</button>
+                <a href="{% url 'expense_list' %}" class="btn btn-outline-secondary w-100">वापस</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
