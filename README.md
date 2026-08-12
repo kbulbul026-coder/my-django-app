@@ -45,4 +45,9 @@ Designed especially for small landlords and property owners who manage rooms/hou
 
 ---
 
-## Project Structure
+## Installation on Termux (Android)
+
+### 1. Update Termux & Install required packages
+```bash
+pkg update && pkg upgrade
+pkg install python git
