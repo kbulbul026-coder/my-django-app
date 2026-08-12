@@ -57,19 +57,7 @@ A lightweight Tenant & Rent Management web application built with Django — des
 | :---: |
 | ![Bill History](docs/screenshots/bill-history.png) |
 
-end
 
-
-
-
-
-## Demo / Screenshots
-
-Add screenshots to a `docs/` or `screenshots/` folder and link them here. Example:
-
-- docs/screenshots/dashboard.png
-
----
 
 ## Requirements
 
