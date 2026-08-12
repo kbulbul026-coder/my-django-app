@@ -42,6 +42,27 @@ A lightweight Tenant & Rent Management web application built with Django — des
 
 ---
 
+
+## Demo / Screenshots
+
+| Dashboard | Add Expense |
+| :---: | :---: |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Add Expense](docs/screenshots/add-expense.png) |
+
+| Expense List | Record Payment |
+| :---: | :---: |
+| ![Expense List](docs/screenshots/expense-list.png) | ![Record Payment](docs/screenshots/record-payment.png) |
+
+| Bill History |
+| :---: |
+| ![Bill History](docs/screenshots/bill-history.png) |
+
+end
+
+
+
+
+
 ## Demo / Screenshots
 
 Add screenshots to a `docs/` or `screenshots/` folder and link them here. Example:
