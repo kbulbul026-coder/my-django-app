@@ -99,3 +99,21 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.date} - {self.get_category_display()} - ₹{self.amount}"
+
+
+
+class Payment(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('CASH', 'Cash'),
+        ('DIGITAL', 'Digital (UPI/Bank)'),
+    ]
+
+    rent_record = models.ForeignKey(RentRecord, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES)
+    payment_date = models.DateField()
+    note = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.rent_record.tenant.name} - ₹{self.amount} on {self.payment_date}"
