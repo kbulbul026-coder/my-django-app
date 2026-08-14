@@ -47,6 +47,7 @@ def add_tenant(request):
         phone = request.POST.get('phone')
         property_id = request.POST.get('property')
         advance_security = request.POST.get('advance_security') or 0
+        billing_day = int(request.POST.get('billing_day') or 1)
 
         selected_property = get_object_or_404(Property, id=property_id)
 
@@ -56,11 +57,28 @@ def add_tenant(request):
             property_assigned=selected_property,
             advance_security=advance_security,
             move_in_date=timezone.now().date(),
-            is_active=True
+            is_active=True,
+            billing_day=billing_day
         )
         return redirect('dashboard')
 
     return render(request, 'add_tenant.html', {'properties': properties})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def generate_bill(request, tenant_id):
@@ -68,26 +86,48 @@ def generate_bill(request, tenant_id):
 
     if request.method == 'POST':
         month_year = request.POST.get('month_year')
+        rent_amount = Decimal(str(request.POST.get('rent_amount') or tenant.property_assigned.monthly_rent))
         units = int(request.POST.get('units') or 0)
         rate_per_unit = Decimal(str(request.POST.get('rate') or 8))
 
-        rent = tenant.property_assigned.monthly_rent
         elec_charge = Decimal(units) * rate_per_unit
-        total_due = rent + elec_charge
+        total_due = rent_amount + elec_charge
 
         RentRecord.objects.create(
             tenant=tenant,
             month_year=month_year,
-            rent_amount=rent,
+            rent_amount=rent_amount,
             electricity_units=units,
             electricity_charge=elec_charge,
             total_due=total_due,
             amount_paid=0,
             status='PENDING'
         )
-        return redirect('dashboard')
+        return redirect('tenant_bills', tenant_id=tenant.id)
 
-    return render(request, 'generate_bill.html', {'tenant': tenant})
+    return render(request, 'generate_bill.html', {
+        'tenant': tenant,
+        'default_rent': tenant.property_assigned.monthly_rent
+    })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def tenant_bills(request, tenant_id):

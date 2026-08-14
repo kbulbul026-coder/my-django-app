@@ -65,7 +65,16 @@
                 <tbody>
                     {% for tenant in tenants %}
                     <tr>
-                        <td>{{ tenant.name }}</td>
+                        
+
+
+<td>
+    {{ tenant.name }}
+    <br>
+    <small class="text-muted">Billing Day: {{ tenant.billing_day }}</small>
+</td>
+
+
                         <td>{{ tenant.property_assigned.property_name }}</td>
                         <td>{{ tenant.phone }}</td>
                         <td>

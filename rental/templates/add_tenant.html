@@ -29,6 +29,15 @@
                     {% endfor %}
                 </select>
             </div>
+
+<div class="mb-3">
+    <label class="form-label">Billing Day (किराया शुरू होने की तारीख)</label>
+    <input type="number" name="billing_day" class="form-control" 
+           value="1" min="1" max="28" required>
+    <small class="text-muted">Example: 1 = 1st of every month, 5 = 5th of every month</small>
+</div>
+
+
             <div class="mb-3">
                 <label class="form-label">एडवांस सिक्योरिटी (₹)</label>
                 <input type="number" name="advance_security" class="form-control" value="0" min="0">

@@ -18,6 +18,12 @@ class Tenant(models.Model):
     move_out_date = models.DateField(null=True, blank=True)
     advance_security = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
+    
+    # New field
+    billing_day = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Day of the month when rent cycle starts (1-28)"
+    )
 
     def __str__(self):
         status = "Active" if self.is_active else "Inactive"
@@ -31,6 +37,10 @@ class Tenant(models.Model):
             return 'PENDING'
         latest = self.rentrecord_set.order_by('-id').first()
         return latest.status if latest else "No Bill"
+
+
+
+
 
 
 class RentRecord(models.Model):
