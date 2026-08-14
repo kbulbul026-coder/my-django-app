@@ -12,6 +12,8 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">किराया प्रबंधन डैशबोर्ड</h2>
         <a href="{% url 'expense_list' %}" class="btn btn-outline-danger btn-sm">खर्च देखें</a>
+        <a href="{% url 'inactive_tenants' %}" class="btn btn-outline-secondary btn-sm ms-2">Previous Tenants</a>
+
     </div>
     
     <!-- Summary Cards -->
@@ -45,7 +47,7 @@
     <!-- Tenants Table -->
     <div class="card p-3 shadow-sm">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4>किरायेदारों की सूची</h4>
+            <h4>किरायेदारों की सूची (Active)</h4>
             <a href="{% url 'add_tenant' %}" class="btn btn-primary">+ नया किरायेदार जोड़ें</a>
         </div>
 
@@ -56,7 +58,7 @@
                         <th>नाम</th>
                         <th>कमरा / प्रॉपर्टी</th>
                         <th>संपर्क</th>
-                        <th>नवीनतम स्थिति</th>
+                        <th>स्थिति</th>
                         <th>एक्शन</th>
                     </tr>
                 </thead>
@@ -71,22 +73,23 @@
                                 <span class="badge bg-success">Paid</span>
                             {% elif tenant.latest_status == 'PENDING' %}
                                 <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif tenant.latest_status == 'INACTIVE' %}
+                                <span class="badge bg-secondary">Inactive</span>
                             {% else %}
                                 <span class="badge bg-secondary">No Bill</span>
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'generate_bill' tenant.id %}" class="btn btn-sm btn-outline-dark me-1">
-                                बिल बनाएं
-                            </a>
-                            <a href="{% url 'tenant_bills' tenant.id %}" class="btn btn-sm btn-outline-primary">
-                                बिल इतिहास
-                            </a>
+                            <a href="{% url 'generate_bill' tenant.id %}" class="btn btn-sm btn-outline-dark me-1">बिल बनाएं</a>
+                            <a href="{% url 'tenant_bills' tenant.id %}" class="btn btn-sm btn-outline-primary me-1">बिल इतिहास</a>
+                            {% if tenant.is_active %}
+                                <a href="{% url 'move_out' tenant.id %}" class="btn btn-sm btn-outline-danger">Move Out</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted">कोई किरायेदार नहीं मिला</td>
+                        <td colspan="5" class="text-center text-muted">कोई सक्रिय किरायेदार नहीं मिला</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Documents - {{ tenant.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>{{ tenant.name }} - Documents</h3>
+            <p class="text-muted mb-0">{{ tenant.property_assigned.property_name }}</p>
+        </div>
+        <a href="{% url 'tenant_bills' tenant.id %}" class="btn btn-outline-secondary">वापस</a>
+    </div>
+
+    <!-- Upload Form -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Upload New Document</h5>
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <select name="document_type" class="form-select" required>
+                            <option value="AADHAAR">Aadhaar Card</option>
+                            <option value="AGREEMENT">Rent Agreement</option>
+                            <option value="PHOTO">Photo</option>
+                            <option value="POLICE">Police Verification</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="title" class="form-control" placeholder="Title (optional)">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="file" name="file" class="form-control" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Upload Document</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Documents List -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Uploaded</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documents %}
+                    <tr>
+                        <td>{{ doc.get_document_type_display }}</td>
+                        <td>{{ doc.title|default:"—" }}</td>
+                        <td>{{ doc.uploaded_at|date:"d M Y" }}</td>
+                        <td>
+                            <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">View</a>
+                            <a href="{% url 'delete_document' doc.id %}" class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('Delete this document?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No documents uploaded yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

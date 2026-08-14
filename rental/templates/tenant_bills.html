@@ -16,6 +16,8 @@
             <p class="text-muted mb-0">
                 कमरा: <strong>{{ tenant.property_assigned.property_name }}</strong> | 
                 फोन: {{ tenant.phone }}
+                <a href="{% url 'tenant_documents' tenant.id %}" class="btn btn-outline-info btn-sm">Documents</a>
+
             </p>
         </div>
         <div>

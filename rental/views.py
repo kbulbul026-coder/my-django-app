@@ -5,11 +5,17 @@ from decimal import Decimal
 from datetime import datetime
 import urllib.parse
 
-from .models import Tenant, Property, RentRecord, Expense, Payment
+
+from .models import Tenant, Property, RentRecord, Expense, Payment, TenantDocument
+
+
+
+
 
 
 def dashboard(request):
-    tenants = Tenant.objects.select_related('property_assigned').all()
+    # Show only active tenants by default
+    tenants = Tenant.objects.filter(is_active=True).select_related('property_assigned')
     total_tenants = tenants.count()
 
     total_collected = RentRecord.objects.aggregate(
@@ -49,7 +55,8 @@ def add_tenant(request):
             phone=phone,
             property_assigned=selected_property,
             advance_security=advance_security,
-            move_in_date=timezone.now().date()
+            move_in_date=timezone.now().date(),
+            is_active=True
         )
         return redirect('dashboard')
 
@@ -121,7 +128,6 @@ def record_payment(request, record_id):
         if amount > 0:
             payment_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
 
-            # Create payment history
             Payment.objects.create(
                 rent_record=record,
                 amount=amount,
@@ -130,7 +136,6 @@ def record_payment(request, record_id):
                 note=note
             )
 
-            # Update total
             record.amount_paid += amount
             record.payment_method = method
             record.payment_date = payment_date
@@ -164,6 +169,69 @@ def edit_payment(request, record_id):
 
     return render(request, 'edit_payment.html', {
         'record': record,
+        'today': timezone.now().date().isoformat()
+    })
+
+
+def edit_single_payment(request, payment_id):
+    payment = get_object_or_404(Payment, id=payment_id)
+    record = payment.rent_record
+
+    if request.method == 'POST':
+        old_amount = payment.amount
+        new_amount = Decimal(str(request.POST.get('amount') or 0))
+        method = request.POST.get('payment_method')
+        date_str = request.POST.get('payment_date')
+        note = request.POST.get('note', '')
+
+        payment.amount = new_amount
+        payment.payment_method = method
+        payment.note = note
+        if date_str:
+            payment.payment_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        payment.save()
+
+        record.amount_paid = record.amount_paid - old_amount + new_amount
+        record.update_status()
+
+        return redirect('tenant_bills', tenant_id=record.tenant.id)
+
+    return render(request, 'edit_single_payment.html', {
+        'payment': payment,
+        'record': record,
+        'today': timezone.now().date().isoformat()
+    })
+
+
+def delete_payment(request, payment_id):
+    payment = get_object_or_404(Payment, id=payment_id)
+    record = payment.rent_record
+
+    record.amount_paid -= payment.amount
+    if record.amount_paid < 0:
+        record.amount_paid = 0
+
+    payment.delete()
+    record.update_status()
+
+    return redirect('tenant_bills', tenant_id=record.tenant.id)
+
+
+def move_out_tenant(request, tenant_id):
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+
+    if request.method == 'POST':
+        move_out_date = request.POST.get('move_out_date')
+        tenant.is_active = False
+        if move_out_date:
+            tenant.move_out_date = datetime.strptime(move_out_date, '%Y-%m-%d').date()
+        else:
+            tenant.move_out_date = timezone.now().date()
+        tenant.save()
+        return redirect('dashboard')
+
+    return render(request, 'move_out.html', {
+        'tenant': tenant,
         'today': timezone.now().date().isoformat()
     })
 
@@ -234,50 +302,46 @@ def add_expense(request):
         'today': timezone.now().date().isoformat()
     })
 
+def inactive_tenants(request):
+    tenants = Tenant.objects.filter(is_active=False).select_related('property_assigned').order_by('-move_out_date')
+    
+    context = {
+        'tenants': tenants,
+    }
+    return render(request, 'inactive_tenants.html', context)
 
 
 
-def edit_single_payment(request, payment_id):
-    payment = get_object_or_404(Payment, id=payment_id)
-    record = payment.rent_record
+
+
+
+def tenant_documents(request, tenant_id):
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    documents = tenant.documents.all().order_by('-uploaded_at')
 
     if request.method == 'POST':
-        old_amount = payment.amount
-        new_amount = Decimal(str(request.POST.get('amount') or 0))
-        method = request.POST.get('payment_method')
-        date_str = request.POST.get('payment_date')
-        note = request.POST.get('note', '')
+        document_type = request.POST.get('document_type')
+        title = request.POST.get('title', '')
+        file = request.FILES.get('file')
 
-        payment.amount = new_amount
-        payment.payment_method = method
-        payment.note = note
-        if date_str:
-            payment.payment_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        payment.save()
+        if file:
+            TenantDocument.objects.create(
+                tenant=tenant,
+                document_type=document_type,
+                title=title,
+                file=file
+            )
+        return redirect('tenant_documents', tenant_id=tenant.id)
 
-        # Recalculate total paid on the bill
-        record.amount_paid = record.amount_paid - old_amount + new_amount
-        record.update_status()
-
-        return redirect('tenant_bills', tenant_id=record.tenant.id)
-
-    return render(request, 'edit_single_payment.html', {
-        'payment': payment,
-        'record': record,
-        'today': timezone.now().date().isoformat()
+    return render(request, 'tenant_documents.html', {
+        'tenant': tenant,
+        'documents': documents
     })
 
 
-def delete_payment(request, payment_id):
-    payment = get_object_or_404(Payment, id=payment_id)
-    record = payment.rent_record
-
-    # Subtract the amount from total paid
-    record.amount_paid -= payment.amount
-    if record.amount_paid < 0:
-        record.amount_paid = 0
-
-    payment.delete()
-    record.update_status()
-
-    return redirect('tenant_bills', tenant_id=record.tenant.id)
+def delete_document(request, document_id):
+    document = get_object_or_404(TenantDocument, id=document_id)
+    tenant_id = document.tenant.id
+    document.file.delete()  # delete actual file
+    document.delete()
+    return redirect('tenant_documents', tenant_id=tenant_id)

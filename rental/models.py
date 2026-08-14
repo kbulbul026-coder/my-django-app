@@ -15,13 +15,18 @@ class Tenant(models.Model):
     phone = models.CharField(max_length=15)
     property_assigned = models.ForeignKey(Property, on_delete=models.CASCADE)
     move_in_date = models.DateField(default=timezone.now)
+    move_out_date = models.DateField(null=True, blank=True)
     advance_security = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.name} ({self.property_assigned.property_name})"
+        status = "Active" if self.is_active else "Inactive"
+        return f"{self.name} ({self.property_assigned.property_name}) - {status}"
 
     @property
     def latest_status(self):
+        if not self.is_active:
+            return "INACTIVE"
         if self.rentrecord_set.filter(status__in=['PENDING', 'PARTIAL']).exists():
             return 'PENDING'
         latest = self.rentrecord_set.order_by('-id').first()
@@ -73,6 +78,26 @@ class RentRecord(models.Model):
         self.save()
 
 
+class Payment(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('CASH', 'Cash'),
+        ('DIGITAL', 'Digital (UPI/Bank)'),
+    ]
+
+    rent_record = models.ForeignKey(RentRecord, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES)
+    payment_date = models.DateField()
+    note = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-id']
+
+    def __str__(self):
+        return f"{self.rent_record.tenant.name} - ₹{self.amount} on {self.payment_date}"
+
+
 class Expense(models.Model):
     CATEGORY_CHOICES = [
         ('MAINTENANCE', 'Maintenance / मरम्मत'),
@@ -101,19 +126,20 @@ class Expense(models.Model):
         return f"{self.date} - {self.get_category_display()} - ₹{self.amount}"
 
 
-
-class Payment(models.Model):
-    PAYMENT_METHOD_CHOICES = [
-        ('CASH', 'Cash'),
-        ('DIGITAL', 'Digital (UPI/Bank)'),
+class TenantDocument(models.Model):
+    DOCUMENT_TYPES = [
+        ('AADHAAR', 'Aadhaar Card'),
+        ('AGREEMENT', 'Rent Agreement'),
+        ('PHOTO', 'Photo'),
+        ('POLICE', 'Police Verification'),
+        ('OTHER', 'Other'),
     ]
 
-    rent_record = models.ForeignKey(RentRecord, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES)
-    payment_date = models.DateField()
-    note = models.CharField(max_length=200, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='documents')
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
+    title = models.CharField(max_length=100, blank=True)
+    file = models.FileField(upload_to='tenant_documents/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.rent_record.tenant.name} - ₹{self.amount} on {self.payment_date}"
+        return f"{self.tenant.name} - {self.get_document_type_display()}"
