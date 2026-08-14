@@ -138,3 +138,5 @@ import os
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# At the bottom of config/settings.py
+GEMINI_API_KEY = "AIzaSyDHKH9A2KC0tx4t8U2je_eAU0RpzWM6BXI"   # ← Paste your key here

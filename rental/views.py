@@ -276,20 +276,15 @@ def move_out_tenant(request, tenant_id):
     })
 
 
+
+from .ai_helpers import generate_smart_whatsapp_message
+import urllib.parse
+
 def send_whatsapp_bill(request, record_id):
     record = get_object_or_404(RentRecord, id=record_id)
 
-    message = (
-        f"नमस्ते {record.tenant.name} जी,\n\n"
-        f"आपका {record.month_year} का किराया बिल:\n"
-        f"• कमरा किराया: ₹{record.rent_amount}\n"
-        f"• बिजली बिल ({record.electricity_units} units): ₹{record.electricity_charge}\n"
-        f"-----------------------------\n"
-        f"कुल बिल: ₹{record.total_due}\n"
-        f"भुगतान हो चुका: ₹{record.amount_paid}\n"
-        f"बाकी बकाया: ₹{record.remaining}\n\n"
-        f"कृपया समय पर भुगतान करें।\nधन्यवाद!"
-    )
+    # Generate smart message using Gemini
+    message = generate_smart_whatsapp_message(record)
 
     encoded_message = urllib.parse.quote(message)
     phone = record.tenant.phone.strip().replace('+', '').replace(' ', '').replace('-', '')
