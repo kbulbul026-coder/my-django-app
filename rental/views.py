@@ -155,7 +155,7 @@ def tenant_bills(request, tenant_id):
     }
     return render(request, 'tenant_bills.html', context)
 
-
+"""
 def record_payment(request, record_id):
     record = get_object_or_404(RentRecord, id=record_id)
 
@@ -188,6 +188,62 @@ def record_payment(request, record_id):
         'today': timezone.now().date().isoformat(),
         'remaining': record.remaining
     })
+
+
+
+from decimal import Decimal
+from datetime import datetime
+from django.utils import timezone
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import RentRecord, Payment
+"""
+
+from .sheets_helper import log_to_sheet  # Ensure this path matches your project structure
+
+def record_payment(request, record_id):
+    record = get_object_or_404(RentRecord, id=record_id)
+
+    if request.method == 'POST':
+        amount = Decimal(str(request.POST.get('amount') or 0))
+        method = request.POST.get('payment_method')
+        date_str = request.POST.get('payment_date')
+        note = request.POST.get('note', '')
+
+        if amount > 0:
+            payment_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+
+            # 1. Create payment history
+            Payment.objects.create(
+                rent_record=record,
+                amount=amount,
+                payment_method=method,
+                payment_date=payment_date,
+                note=note
+            )
+
+            # 2. Update total paid
+            record.amount_paid += amount
+            record.payment_method = method
+            record.payment_date = payment_date
+            record.update_status()
+
+            # 3. Log to Google Sheets (ONLY ONCE)
+            log_to_sheet(
+                action="Payment Received",
+                tenant_name=record.tenant.name,
+                details=f"{method} payment",
+                amount=amount,
+                month=record.month_year
+            )
+
+        return redirect('tenant_bills', tenant_id=record.tenant.id)
+
+    return render(request, 'record_payment.html', {
+        'record': record,
+        'today': timezone.now().date().isoformat(),
+        'remaining': record.remaining
+    })
+
 
 
 def edit_payment(request, record_id):

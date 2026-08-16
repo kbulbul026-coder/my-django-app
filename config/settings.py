@@ -140,3 +140,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # At the bottom of config/settings.py
 GEMINI_API_KEY = "AIzaSyDHKH9A2KC0tx4t8U2je_eAU0RpzWM6BXI"   # ← Paste your key here
+
+import os
+
+GOOGLE_SHEETS_CREDENTIALS = os.path.join(BASE_DIR, 'credentials.json')
+GOOGLE_SHEET_ID = "1hr1l_0RHFvpnoAep_OOBkOjEkIFj_iaSr5vyfKmXA-A"

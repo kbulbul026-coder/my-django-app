@@ -47,9 +47,20 @@
                     <input type="text" name="note" class="form-control" placeholder="e.g. Paid via PhonePe">
                 </div>
 
-                <button type="submit" class="btn btn-success btn-lg w-100 mb-2">
-                    Save Payment
-                </button>
+
+
+<button type="submit" 
+        class="btn btn-success btn-lg w-100 mb-2"
+        onclick="this.disabled=true; this.innerHTML='Saving...'; this.form.submit();">
+    Save Payment
+</button>
+
+
+
+
+
+
+
                 <a href="{% url 'tenant_bills' record.tenant.id %}" class="btn btn-outline-secondary w-100">
                     Cancel
                 </a>
