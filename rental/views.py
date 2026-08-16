@@ -5,26 +5,18 @@ from decimal import Decimal
 from datetime import datetime
 import urllib.parse
 
-
 from .models import Tenant, Property, RentRecord, Expense, Payment, TenantDocument
-
-
-
-
+from .sheets_helper import log_to_sheet
+from .ai_helpers import generate_smart_whatsapp_message
 
 
 def dashboard(request):
-    # Show only active tenants by default
     tenants = Tenant.objects.filter(is_active=True).select_related('property_assigned')
     total_tenants = tenants.count()
 
-    total_collected = RentRecord.objects.aggregate(
-        total=Sum('amount_paid')
-    )['total'] or 0
-
+    total_collected = RentRecord.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
     all_records = RentRecord.objects.all()
     total_pending = sum((r.total_due - r.amount_paid) for r in all_records)
-
     total_expense = Expense.objects.aggregate(total=Sum('amount'))['total'] or 0
     net_profit = total_collected - total_expense
 
@@ -51,7 +43,7 @@ def add_tenant(request):
 
         selected_property = get_object_or_404(Property, id=property_id)
 
-        Tenant.objects.create(
+        tenant = Tenant.objects.create(
             name=name,
             phone=phone,
             property_assigned=selected_property,
@@ -60,25 +52,19 @@ def add_tenant(request):
             is_active=True,
             billing_day=billing_day
         )
+
+        # Log to Google Sheets
+        log_to_sheet(
+            action="New Tenant Added",
+            tenant_name=name,
+            details=f"Room: {selected_property.property_name} | Phone: {phone}",
+            amount=advance_security,
+            month=""
+        )
+
         return redirect('dashboard')
 
     return render(request, 'add_tenant.html', {'properties': properties})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def generate_bill(request, tenant_id):
@@ -103,31 +89,22 @@ def generate_bill(request, tenant_id):
             amount_paid=0,
             status='PENDING'
         )
+
+        # Log to Google Sheets
+        log_to_sheet(
+            action="Bill Generated",
+            tenant_name=tenant.name,
+            details=f"Rent: ₹{rent_amount} | Electricity: ₹{elec_charge}",
+            amount=total_due,
+            month=month_year
+        )
+
         return redirect('tenant_bills', tenant_id=tenant.id)
 
     return render(request, 'generate_bill.html', {
         'tenant': tenant,
         'default_rent': tenant.property_assigned.monthly_rent
     })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def tenant_bills(request, tenant_id):
@@ -155,7 +132,7 @@ def tenant_bills(request, tenant_id):
     }
     return render(request, 'tenant_bills.html', context)
 
-"""
+
 def record_payment(request, record_id):
     record = get_object_or_404(RentRecord, id=record_id)
 
@@ -181,53 +158,7 @@ def record_payment(request, record_id):
             record.payment_date = payment_date
             record.update_status()
 
-        return redirect('tenant_bills', tenant_id=record.tenant.id)
-
-    return render(request, 'record_payment.html', {
-        'record': record,
-        'today': timezone.now().date().isoformat(),
-        'remaining': record.remaining
-    })
-
-
-
-from decimal import Decimal
-from datetime import datetime
-from django.utils import timezone
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import RentRecord, Payment
-"""
-
-from .sheets_helper import log_to_sheet  # Ensure this path matches your project structure
-
-def record_payment(request, record_id):
-    record = get_object_or_404(RentRecord, id=record_id)
-
-    if request.method == 'POST':
-        amount = Decimal(str(request.POST.get('amount') or 0))
-        method = request.POST.get('payment_method')
-        date_str = request.POST.get('payment_date')
-        note = request.POST.get('note', '')
-
-        if amount > 0:
-            payment_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
-
-            # 1. Create payment history
-            Payment.objects.create(
-                rent_record=record,
-                amount=amount,
-                payment_method=method,
-                payment_date=payment_date,
-                note=note
-            )
-
-            # 2. Update total paid
-            record.amount_paid += amount
-            record.payment_method = method
-            record.payment_date = payment_date
-            record.update_status()
-
-            # 3. Log to Google Sheets (ONLY ONCE)
+            # Log to Google Sheets (only once)
             log_to_sheet(
                 action="Payment Received",
                 tenant_name=record.tenant.name,
@@ -243,7 +174,6 @@ def record_payment(request, record_id):
         'today': timezone.now().date().isoformat(),
         'remaining': record.remaining
     })
-
 
 
 def edit_payment(request, record_id):
@@ -290,6 +220,14 @@ def edit_single_payment(request, payment_id):
         record.amount_paid = record.amount_paid - old_amount + new_amount
         record.update_status()
 
+        log_to_sheet(
+            action="Payment Edited",
+            tenant_name=record.tenant.name,
+            details=f"Changed from ₹{old_amount} to ₹{new_amount}",
+            amount=new_amount,
+            month=record.month_year
+        )
+
         return redirect('tenant_bills', tenant_id=record.tenant.id)
 
     return render(request, 'edit_single_payment.html', {
@@ -302,13 +240,22 @@ def edit_single_payment(request, payment_id):
 def delete_payment(request, payment_id):
     payment = get_object_or_404(Payment, id=payment_id)
     record = payment.rent_record
+    amount = payment.amount
 
-    record.amount_paid -= payment.amount
+    record.amount_paid -= amount
     if record.amount_paid < 0:
         record.amount_paid = 0
 
     payment.delete()
     record.update_status()
+
+    log_to_sheet(
+        action="Payment Deleted",
+        tenant_name=record.tenant.name,
+        details=f"Deleted payment of ₹{amount}",
+        amount=amount,
+        month=record.month_year
+    )
 
     return redirect('tenant_bills', tenant_id=record.tenant.id)
 
@@ -324,6 +271,15 @@ def move_out_tenant(request, tenant_id):
         else:
             tenant.move_out_date = timezone.now().date()
         tenant.save()
+
+        log_to_sheet(
+            action="Tenant Moved Out",
+            tenant_name=tenant.name,
+            details=f"Room: {tenant.property_assigned.property_name}",
+            amount="",
+            month=""
+        )
+
         return redirect('dashboard')
 
     return render(request, 'move_out.html', {
@@ -332,14 +288,14 @@ def move_out_tenant(request, tenant_id):
     })
 
 
+def inactive_tenants(request):
+    tenants = Tenant.objects.filter(is_active=False).select_related('property_assigned').order_by('-move_out_date')
+    return render(request, 'inactive_tenants.html', {'tenants': tenants})
 
-from .ai_helpers import generate_smart_whatsapp_message
-import urllib.parse
 
 def send_whatsapp_bill(request, record_id):
     record = get_object_or_404(RentRecord, id=record_id)
 
-    # Generate smart message using Gemini
     message = generate_smart_whatsapp_message(record)
 
     encoded_message = urllib.parse.quote(message)
@@ -356,11 +312,10 @@ def expense_list(request):
     expenses = Expense.objects.select_related('property').order_by('-date', '-id')
     total_expense = expenses.aggregate(total=Sum('amount'))['total'] or 0
 
-    context = {
+    return render(request, 'expense_list.html', {
         'expenses': expenses,
         'total_expense': total_expense,
-    }
-    return render(request, 'expense_list.html', context)
+    })
 
 
 def add_expense(request):
@@ -386,24 +341,21 @@ def add_expense(request):
             description=description,
             payment_method=payment_method
         )
+
+        log_to_sheet(
+            action="Expense Added",
+            tenant_name="",
+            details=f"{category} - {description}",
+            amount=amount,
+            month=""
+        )
+
         return redirect('expense_list')
 
     return render(request, 'add_expense.html', {
         'properties': properties,
         'today': timezone.now().date().isoformat()
     })
-
-def inactive_tenants(request):
-    tenants = Tenant.objects.filter(is_active=False).select_related('property_assigned').order_by('-move_out_date')
-    
-    context = {
-        'tenants': tenants,
-    }
-    return render(request, 'inactive_tenants.html', context)
-
-
-
-
 
 
 def tenant_documents(request, tenant_id):
@@ -433,6 +385,6 @@ def tenant_documents(request, tenant_id):
 def delete_document(request, document_id):
     document = get_object_or_404(TenantDocument, id=document_id)
     tenant_id = document.tenant.id
-    document.file.delete()  # delete actual file
+    document.file.delete(save=False)
     document.delete()
     return redirect('tenant_documents', tenant_id=tenant_id)
