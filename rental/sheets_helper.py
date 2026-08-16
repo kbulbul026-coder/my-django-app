@@ -1,3 +1,5 @@
+import time
+import threading
 import gspread
 from google.oauth2.service_account import Credentials
 from django.conf import settings
@@ -18,22 +20,48 @@ def get_sheet():
     return sheet
 
 
-def log_to_sheet(action, tenant_name="", details="", amount="", month=""):
-    try:
-        sheet = get_sheet()
-        timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+def _log_to_sheet_sync(action, tenant_name="", room="", bill_month="", amount="", 
+                       payment_method="", note="", status="Success"):
+    """Actual logging function (runs in background)"""
+    max_retries = 3
 
-        row = [
-            timestamp,
-            action,
-            tenant_name,
-            details,
-            str(amount),
-            month
-        ]
-        sheet.append_row(row)
-        print("Logged to Google Sheets successfully")
-        return True
-    except Exception as e:
-        print("Google Sheets Error:", e)
-        return False
+    for attempt in range(max_retries):
+        try:
+            sheet = get_sheet()
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            row = [
+                timestamp,
+                action,
+                tenant_name,
+                room,
+                bill_month,
+                str(amount),
+                payment_method,
+                note,
+                status
+            ]
+            sheet.append_row(row)
+            print("Logged to Google Sheets successfully")
+            return True
+
+        except Exception as e:
+            print(f"Google Sheets Error (attempt {attempt+1}):", e)
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            else:
+                print("Failed to log after 3 attempts")
+                return False
+
+
+def log_to_sheet(action, tenant_name="", room="", bill_month="", amount="", 
+                 payment_method="", note="", status="Success"):
+    """
+    Asynchronous version - does not block the main request
+    """
+    thread = threading.Thread(
+        target=_log_to_sheet_sync,
+        args=(action, tenant_name, room, bill_month, amount, payment_method, note, status)
+    )
+    thread.daemon = True   # dies when main program exits
+    thread.start()

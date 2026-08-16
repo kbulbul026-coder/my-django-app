@@ -4,53 +4,14 @@ from django.utils import timezone
 from decimal import Decimal
 from datetime import datetime
 import urllib.parse
-
-from .models import Tenant, Property, RentRecord, Expense, Payment, TenantDocument
-from .sheets_helper import log_to_sheet
-from .ai_helpers import generate_smart_whatsapp_message
-
-
 import qrcode
 import io
 import base64
+
 from django.conf import settings
-
-def generate_upi_qr(request, record_id):
-    record = get_object_or_404(RentRecord, id=record_id)
-
-    amount = record.remaining
-    note = f"{record.tenant.name} - {record.month_year}"
-
-    # Create UPI payment link
-    upi_link = (
-        f"upi://pay?"
-        f"pa={settings.UPI_ID}"
-        f"&pn={settings.UPI_NAME}"
-        f"&am={amount}"
-        f"&cu=INR"
-        f"&tn={note}"
-    )
-
-    # Generate QR Code
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(upi_link)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
-
-    context = {
-        'record': record,
-        'amount': amount,
-        'qr_code': qr_base64,
-        'upi_link': upi_link,
-        'note': note
-    }
-    return render(request, 'upi_qr.html', context)
-
+from .models import Tenant, Property, RentRecord, Expense, Payment, TenantDocument
+from .sheets_helper import log_to_sheet
+from .ai_helpers import generate_smart_whatsapp_message
 
 
 def dashboard(request):
@@ -96,13 +57,15 @@ def add_tenant(request):
             billing_day=billing_day
         )
 
-        # Log to Google Sheets
         log_to_sheet(
             action="New Tenant Added",
             tenant_name=name,
-            details=f"Room: {selected_property.property_name} | Phone: {phone}",
+            room=selected_property.property_name,
+            bill_month="",
             amount=advance_security,
-            month=""
+            payment_method="",
+            note=f"Phone: {phone} | Billing Day: {billing_day}",
+            status="Success"
         )
 
         return redirect('dashboard')
@@ -133,13 +96,15 @@ def generate_bill(request, tenant_id):
             status='PENDING'
         )
 
-        # Log to Google Sheets
         log_to_sheet(
             action="Bill Generated",
             tenant_name=tenant.name,
-            details=f"Rent: ₹{rent_amount} | Electricity: ₹{elec_charge}",
+            room=tenant.property_assigned.property_name,
+            bill_month=month_year,
             amount=total_due,
-            month=month_year
+            payment_method="",
+            note=f"Rent: ₹{rent_amount} | Electricity: ₹{elec_charge}",
+            status="Pending"
         )
 
         return redirect('tenant_bills', tenant_id=tenant.id)
@@ -201,13 +166,15 @@ def record_payment(request, record_id):
             record.payment_date = payment_date
             record.update_status()
 
-            # Log to Google Sheets (only once)
             log_to_sheet(
                 action="Payment Received",
                 tenant_name=record.tenant.name,
-                details=f"{method} payment",
+                room=record.tenant.property_assigned.property_name,
+                bill_month=record.month_year,
                 amount=amount,
-                month=record.month_year
+                payment_method=method,
+                note=note,
+                status="Success"
             )
 
         return redirect('tenant_bills', tenant_id=record.tenant.id)
@@ -266,9 +233,12 @@ def edit_single_payment(request, payment_id):
         log_to_sheet(
             action="Payment Edited",
             tenant_name=record.tenant.name,
-            details=f"Changed from ₹{old_amount} to ₹{new_amount}",
+            room=record.tenant.property_assigned.property_name,
+            bill_month=record.month_year,
             amount=new_amount,
-            month=record.month_year
+            payment_method=method,
+            note=f"Changed from ₹{old_amount} to ₹{new_amount}. {note}",
+            status="Updated"
         )
 
         return redirect('tenant_bills', tenant_id=record.tenant.id)
@@ -284,6 +254,7 @@ def delete_payment(request, payment_id):
     payment = get_object_or_404(Payment, id=payment_id)
     record = payment.rent_record
     amount = payment.amount
+    method = payment.payment_method
 
     record.amount_paid -= amount
     if record.amount_paid < 0:
@@ -295,9 +266,12 @@ def delete_payment(request, payment_id):
     log_to_sheet(
         action="Payment Deleted",
         tenant_name=record.tenant.name,
-        details=f"Deleted payment of ₹{amount}",
+        room=record.tenant.property_assigned.property_name,
+        bill_month=record.month_year,
         amount=amount,
-        month=record.month_year
+        payment_method=method,
+        note=f"Deleted payment of ₹{amount}",
+        status="Deleted"
     )
 
     return redirect('tenant_bills', tenant_id=record.tenant.id)
@@ -318,9 +292,12 @@ def move_out_tenant(request, tenant_id):
         log_to_sheet(
             action="Tenant Moved Out",
             tenant_name=tenant.name,
-            details=f"Room: {tenant.property_assigned.property_name}",
+            room=tenant.property_assigned.property_name,
+            bill_month="",
             amount="",
-            month=""
+            payment_method="",
+            note=f"Move out date: {tenant.move_out_date}",
+            status="Completed"
         )
 
         return redirect('dashboard')
@@ -338,7 +315,6 @@ def inactive_tenants(request):
 
 def send_whatsapp_bill(request, record_id):
     record = get_object_or_404(RentRecord, id=record_id)
-
     message = generate_smart_whatsapp_message(record)
 
     encoded_message = urllib.parse.quote(message)
@@ -349,6 +325,41 @@ def send_whatsapp_bill(request, record_id):
 
     whatsapp_url = f"https://wa.me/{phone}?text={encoded_message}"
     return redirect(whatsapp_url)
+
+
+def generate_upi_qr(request, record_id):
+    record = get_object_or_404(RentRecord, id=record_id)
+
+    amount = record.remaining
+    note = f"{record.tenant.name} - {record.month_year}"
+
+    upi_link = (
+        f"upi://pay?"
+        f"pa={settings.UPI_ID}"
+        f"&pn={settings.UPI_NAME}"
+        f"&am={amount}"
+        f"&cu=INR"
+        f"&tn={note}"
+    )
+
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(upi_link)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+    context = {
+        'record': record,
+        'amount': amount,
+        'qr_code': qr_base64,
+        'upi_link': upi_link,
+        'note': note
+    }
+    return render(request, 'upi_qr.html', context)
 
 
 def expense_list(request):
@@ -388,9 +399,12 @@ def add_expense(request):
         log_to_sheet(
             action="Expense Added",
             tenant_name="",
-            details=f"{category} - {description}",
+            room=property_obj.property_name if property_obj else "Common",
+            bill_month="",
             amount=amount,
-            month=""
+            payment_method=payment_method,
+            note=f"{category} - {description}",
+            status="Success"
         )
 
         return redirect('expense_list')
