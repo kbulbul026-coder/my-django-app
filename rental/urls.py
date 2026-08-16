@@ -19,6 +19,9 @@ urlpatterns = [
     path('documents/<int:tenant_id>/', views.tenant_documents, name='tenant_documents'),
     path('delete-document/<int:document_id>/', views.delete_document, name='delete_document'),
 
+    # UPI QR
+    path('upi-qr/<int:record_id>/', views.generate_upi_qr, name='upi_qr'),
+
     # Expense
     path('expenses/', views.expense_list, name='expense_list'),
     path('add-expense/', views.add_expense, name='add_expense'),

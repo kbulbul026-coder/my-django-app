@@ -145,3 +145,8 @@ import os
 
 GOOGLE_SHEETS_CREDENTIALS = os.path.join(BASE_DIR, 'credentials.json')
 GOOGLE_SHEET_ID = "1hr1l_0RHFvpnoAep_OOBkOjEkIFj_iaSr5vyfKmXA-A"
+
+
+# UPI Settings
+UPI_ID = "6202547056-2@ybl"              # ← Change this to your real UPI ID
+UPI_NAME = "Rajesh Hansda"

@@ -10,18 +10,18 @@
 
 <div class="container my-4">
 
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3 class="mb-1">{{ tenant.name }} - बिल इतिहास</h3>
             <p class="text-muted mb-0">
                 कमरा: <strong>{{ tenant.property_assigned.property_name }}</strong> | 
                 फोन: {{ tenant.phone }}
-                <a href="{% url 'tenant_documents' tenant.id %}" class="btn btn-outline-info btn-sm">Documents</a>
-
             </p>
         </div>
         <div>
-            <a href="{% url 'generate_bill' tenant.id %}" class="btn btn-primary btn-sm">+ नया बिल</a>
+            <a href="{% url 'tenant_documents' tenant.id %}" class="btn btn-outline-info btn-sm me-1">Documents</a>
+            <a href="{% url 'generate_bill' tenant.id %}" class="btn btn-primary btn-sm me-1">+ नया बिल</a>
             <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm">वापस</a>
         </div>
     </div>
@@ -78,28 +78,22 @@
                                 <span class="text-danger"><strong>Remaining:</strong> ₹{{ record.remaining }}</span>
                             </small>
 
-
-{% if record.payments.all %}
-    <hr class="my-1">
-    <small class="text-muted">
-        {% for p in record.payments.all %}
-            • ₹{{ p.amount }} 
-            ({% if p.payment_method == 'CASH' %}Cash{% else %}Digital{% endif %})
-            - {{ p.payment_date|date:"d M Y" }}
-            {% if p.note %}<br>&nbsp;&nbsp;<em>{{ p.note|truncatechars:40 }}</em>{% endif %}
-            <br>
-            <a href="{% url 'edit_single_payment' p.id %}" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:11px;">Edit</a>
-            <a href="{% url 'delete_payment' p.id %}" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px;"
-               onclick="return confirm('क्या आप इस भुगतान को हटाना चाहते हैं?')">Delete</a>
-            <br><br>
-        {% endfor %}
-    </small>
-{% endif %}
-
-
-
-
-
+                            {% if record.payments.all %}
+                                <hr class="my-1">
+                                <small class="text-muted">
+                                    {% for p in record.payments.all %}
+                                        • ₹{{ p.amount }} 
+                                        ({% if p.payment_method == 'CASH' %}Cash{% else %}Digital{% endif %})
+                                        - {{ p.payment_date|date:"d M Y" }}
+                                        {% if p.note %}<br>&nbsp;&nbsp;<em>{{ p.note|truncatechars:40 }}</em>{% endif %}
+                                        <br>
+                                        <a href="{% url 'edit_single_payment' p.id %}" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:11px;">Edit</a>
+                                        <a href="{% url 'delete_payment' p.id %}" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px;"
+                                           onclick="return confirm('क्या आप इस भुगतान को हटाना चाहते हैं?')">Delete</a>
+                                        <br><br>
+                                    {% endfor %}
+                                </small>
+                            {% endif %}
                         </td>
                         <td>
                             {% if record.status == 'PAID' %}
@@ -115,10 +109,15 @@
                                 <a href="{% url 'record_payment' record.id %}" class="btn btn-sm btn-success mb-1">
                                     Record Payment
                                 </a>
+                                <a href="{% url 'upi_qr' record.id %}" class="btn btn-sm btn-outline-info mb-1">
+                                    Generate UPI QR
+                                </a>
                             {% endif %}
+
                             <a href="{% url 'edit_payment' record.id %}" class="btn btn-sm btn-outline-primary mb-1">
                                 Edit
                             </a>
+
                             <a href="{% url 'send_whatsapp' record.id %}" target="_blank" class="btn btn-sm btn-outline-success">
                                 WhatsApp
                             </a>

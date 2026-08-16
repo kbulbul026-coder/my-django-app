@@ -10,6 +10,49 @@ from .sheets_helper import log_to_sheet
 from .ai_helpers import generate_smart_whatsapp_message
 
 
+import qrcode
+import io
+import base64
+from django.conf import settings
+
+def generate_upi_qr(request, record_id):
+    record = get_object_or_404(RentRecord, id=record_id)
+
+    amount = record.remaining
+    note = f"{record.tenant.name} - {record.month_year}"
+
+    # Create UPI payment link
+    upi_link = (
+        f"upi://pay?"
+        f"pa={settings.UPI_ID}"
+        f"&pn={settings.UPI_NAME}"
+        f"&am={amount}"
+        f"&cu=INR"
+        f"&tn={note}"
+    )
+
+    # Generate QR Code
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(upi_link)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+    context = {
+        'record': record,
+        'amount': amount,
+        'qr_code': qr_base64,
+        'upi_link': upi_link,
+        'note': note
+    }
+    return render(request, 'upi_qr.html', context)
+
+
+
 def dashboard(request):
     tenants = Tenant.objects.filter(is_active=True).select_related('property_assigned')
     total_tenants = tenants.count()
